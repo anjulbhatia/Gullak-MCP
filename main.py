@@ -15,6 +15,8 @@ import cachetools
 import os
 from dotenv import load_dotenv
 
+from utils import fetch_gold_price
+
 # --- Load environment variables ---
 load_dotenv()
 
@@ -184,6 +186,38 @@ async def expense_budget_monitor(
             save_user_state(user_id, state)
             return f"✅ Budget set for {month}: " + ", ".join(f"{c} ₹{a}" for c, a in state["budgets"][month].items())
 
+        if command_lower.startswith("edit budget"):
+            # Command format: edit budget <month> <category> <new_amount>
+            parts = command_lower.split()
+            if len(parts) != 5:
+                return "⚠️ Format error. Use: edit budget <month> <category> <new_amount>"
+            month = parts[2].capitalize()
+            category = parts[3].capitalize()
+            try:
+                new_amt = float(parts[4])
+            except ValueError:
+                return f"⚠️ Invalid amount: {parts[4]}"
+            if month not in state["budgets"] or category not in state["budgets"][month]:
+                return f"⚠️ No budget found for {category} in {month} to edit."
+            state["budgets"][month][category] = new_amt
+            save_user_state(user_id, state)
+            return f"✅ Budget updated for {category} in {month}: ₹{new_amt:.2f}"
+
+        if command_lower.startswith("delete budget"):
+            # Command format: delete budget <month> <category>
+            parts = command_lower.split()
+            if len(parts) != 4:
+                return "⚠️ Format error. Use: delete budget <month> <category>"
+            month = parts[2].capitalize()
+            category = parts[3].capitalize()
+            if month not in state["budgets"] or category not in state["budgets"][month]:
+                return f"⚠️ No budget found for {category} in {month} to delete."
+            del state["budgets"][month][category]
+            if not state["budgets"][month]:  # if empty dict, remove month entry
+                del state["budgets"][month]
+            save_user_state(user_id, state)
+            return f"✅ Budget deleted for {category} in {month}"
+
         if command_lower.startswith("spent"):
             m = re.match(r"spent\s+(\d+\.?\d*)\s+on\s+(.+)", command_lower)
             if not m:
@@ -308,6 +342,45 @@ async def purchasing_power_checker(
             f"- **{city2['city']}**: {ppi2}\n"
             f"On this scale, {city1['city']} {comparison}\n"
             "Higher values mean stronger local purchasing power.")
+
+GoldPriceCommandDescription = RichToolDescription(
+    description=(
+        "AI tool that provides the current gold price in INR for today or for a specified city in India. "
+        "It fetches live gold prices per gram and can respond to commands such as "
+        "'gold price today' or 'gold price in Mumbai'. "
+        "Note: Gold prices are mostly uniform across cities with minor local variations."
+    ),
+    use_when=(
+        "Use this tool when users ask about the current gold price in general or want localized "
+        "information for specific cities."
+    ),
+    side_effects=(
+        "Returns the latest gold price per gram in INR along with contextual information. "
+        "If the city is specified, it adds a note about minor local variations. "
+        "Dependent on external metals API availability and key configuration."
+    )
+)
+
+@mcp.tool(description=GoldPriceCommandDescription.model_dump_json())
+async def gold_price_command(
+    command: Annotated[str, Field(description="Command to fetch gold price, e.g. 'gold price today' or 'gold price in Mumbai'")]
+) -> str:
+
+    command_lower = command.lower().strip()
+    # Extract city if mentioned
+    city_match = re.search(r"gold price in ([a-zA-Z\s]+)", command_lower)
+    city = city_match.group(1).strip().title() if city_match else None
+    try:
+        if city:
+            # If city is specified, fetch gold price for that city
+            response = await fetch_gold_price(city)  # Default to Delhi if no specific city data available
+        else:
+            # If no city specified, default to Delhi
+            response = await fetch_gold_price()  # Default to Delhi if no city specified
+        return response
+    except Exception as e:
+        return f"⚠️ Failed to fetch gold price: {str(e)}"
+        
 
 # --- MCP server runner ---
 async def main():

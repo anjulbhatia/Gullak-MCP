@@ -4,3 +4,6 @@ dotenv
 fastmcp
 python-dotenv
 pydantic
+duckdb
+httpx
+feedparser
