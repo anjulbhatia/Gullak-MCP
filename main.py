@@ -15,7 +15,7 @@ import cachetools
 import os
 from dotenv import load_dotenv
 
-from utils import fetch_gold_price
+from utils import fetch_financial_news, fetch_gold_price
 
 # --- Load environment variables ---
 load_dotenv()
@@ -130,7 +130,7 @@ async def core_finance_qa(
 
 FinancialNewsSimplifierDescription = RichToolDescription(
     description="AI-powered tool to simplify and summarize complex financial news or jargon into easy-to-understand language.",
-    use_when="Use when users provide financial news text, reports, or articles they want explained in simple terms.",
+    use_when="Use when users provide financial news text, reports, or articles, jargons they want explained in simple terms.",
     side_effects="Outputs summarized news with jargon explained and key points highlighted."
 )
 
@@ -142,6 +142,61 @@ async def financial_news_simplifier(
     lang = normalize_language(language)
     prompt = f"Summarize this financial news article in simple {lang} language, explaining any jargon:\n\n{news_text}\n\nSummary:"
     return await call_puch_llm(prompt)
+
+# --- Tool: fetch_and_simplify_financial_news ---
+FinancialNewsFetcherDescription = RichToolDescription(
+    description="Fetch latest financial news and produce short, easy-to-understand summaries with links.",
+    use_when="Use when the user asks for today's financial news or a short digest.",
+    side_effects="Performs network fetch of news RSS, simplifies each item, and returns titles + short summaries + links."
+)
+
+@mcp.tool(description=FinancialNewsFetcherDescription.model_dump_json())
+async def fetch_and_simplify_financial_news(
+    limit: Annotated[int, Field(description="Number of news items to fetch (default 5)")] = 5,
+    language: Annotated[str, Field(description="Language code for summary, e.g. 'en' or 'hi'")] = "en"
+) -> str:
+    """
+    Fetch financial news via utils.fetch_financial_news and return simplified summary + link for each item.
+    """
+    try:
+        items = await fetch_financial_news(limit=limit)
+    except Exception as e:
+        raise McpError(ErrorData(code=INVALID_PARAMS, message=f"Failed to fetch financial news: {e}"))
+
+    if not items:
+        return "⚠️ No financial news items were found."
+
+    results = []
+    for i, item in enumerate(items, start=1):
+        title = item.get("title") or "Untitled"
+        link = item.get("link") or ""
+        published = item.get("published", "")
+        # Use summary if available, otherwise use title as the text to simplify
+        raw_text = item.get("summary") or item.get("title") or ""
+
+        # Create a concise prompt to the LLM (or call_puch_llm wrapper)
+        prompt = (
+            f"Summarize this financial news item in simple {language} in 2–3 bullet points.\n\n"
+            f"Title: {title}\n\n"
+            f"Text: {raw_text}\n\n"
+            f"Keep it short, clear, and actionable. Output only short bullets."
+        )
+
+        try:
+            simplified = await call_puch_llm(prompt)
+        except Exception:
+            # If LLM fails, fall back to the raw summary (if any) or title
+            simplified = raw_text[:300] + ("..." if len(raw_text) > 300 else "")
+
+        entry = f"{i}. {title}"
+        if published:
+            entry += f" ({published})"
+        entry += "\n" + simplified.strip()
+        if link:
+            entry += f"\n{link}"
+        results.append(entry)
+
+    return "\n\n".join(results)
 
 ExpenseBudgetMonitorDescription = RichToolDescription(
     description="Expense and budget management tool allowing users to set budgets, log expenses, and track debts or bills via simple commands.",
