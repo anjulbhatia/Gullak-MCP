@@ -1,0 +1,6 @@
+beautifulsoup4
+cachetools
+dotenv
+fastmcp
+python-dotenv
+pydantic
