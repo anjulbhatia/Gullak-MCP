@@ -3,7 +3,7 @@ import json
 import re
 from typing import Annotated, Optional
 from datetime import datetime
-
+from textwrap import dedent
 from pydantic import BaseModel, Field
 from fastmcp import FastMCP
 from fastmcp.server.auth.providers.bearer import BearerAuthProvider, RSAKeyPair
@@ -113,6 +113,24 @@ async def call_puch_llm(prompt: str) -> str:
 async def validate() -> str:
     return MY_NUMBER
 
+
+@mcp.tool
+async def about() -> dict[str, str]:
+    server_name = "Gullak MCP - Your Personal Finance AI"
+    server_description = dedent("""
+    What it can do:
+    ✅ Answer all your personal finance questions in plain language
+    ✅ Help you set up a budget & log expenses—so you actually stick to it
+    ✅ Deliver daily finance news without the jargon
+    ✅ Calculate Local Purchasing Power (finally, 24 LPA in Bangalore vs. 12 LPA in Delhi will make sense!)
+    ✅ Track live gold rates in real time
+    """)
+
+    return {
+        "name": server_name,
+        "description": server_description
+    }
+    
 CoreFinanceQADescription = RichToolDescription(
     description="Conversational AI tool that answers personal finance questions simply and clearly in multiple languages.",
     use_when="Use this tool when users want quick, actionable advice on loans, savings, budgeting, investing, and other finance topics.",
@@ -444,3 +462,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
