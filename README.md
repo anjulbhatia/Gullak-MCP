@@ -1,6 +1,6 @@
 # GullakAI MCP Server
 
-A lightweight MCP server for personal finance assistance, expense tracking, financial news simplification, and local purchasing power comparisons across South Asian cities.
+A lightweight MCP server for personal finance assistance, expense tracking, financial news simplification, and local purchasing power comparisons across Indian cities.
 
 ---
 
@@ -88,6 +88,7 @@ Designed for asynchronous operation suitable for WhatsApp and browser-based chat
 
 ## License
 This project is licensed under the MIT License.
+
 
 
 ***Let me know if you want it expanded or more examples included!***
